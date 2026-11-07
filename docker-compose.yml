@@ -1,0 +1,34 @@
+# Local stack: TimescaleDB (PostgreSQL) + FastAPI backend + dashboard.
+# Usage: cp .env.example .env  &&  docker compose up --build   → http://localhost:8080
+services:
+  db:
+    image: timescale/timescaledb:2.17.2-pg16
+    environment:
+      POSTGRES_DB: triagent
+      POSTGRES_USER: triagent
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U triagent"]
+      interval: 5s
+      retries: 20
+  backend:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://triagent:${POSTGRES_PASSWORD}@db:5432/triagent
+      TRIAGENT_IMPORT_DIR: /app/data/import
+      CORS_ORIGINS: http://localhost:8080
+    volumes:
+      - ./data/import:/app/data/import:ro
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["127.0.0.1:8000:8000"]
+  frontend:
+    build: { context: ., dockerfile: frontend/Dockerfile }
+    depends_on: [backend]
+    ports: ["127.0.0.1:8080:80"]
+volumes:
+  dbdata:

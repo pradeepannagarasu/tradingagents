@@ -149,7 +149,8 @@ def bars(symbol: str, limit: int = 400):
     f = fc.features.tail(limit)
     cols = ["open", "high", "low", "close", "volume", "sma_50", "sma_200", "ema_20", "rsi_14", "bb_upper", "bb_lower",
             "atr_14", "adx", "macd", "signal"]
-    out = f[cols].astype(float).round(4).where(pd.notna(f[cols]), None)
+    out = f[cols].astype(float).round(4).astype(object)
+    out = out.where(pd.notna(out), None)  # warm-up NaNs → null (NaN is not valid JSON)
     return {"symbol": symbol, "simulated": fc.series.simulated, "source": fc.series.source,
             "bars": [{"time": str(i.date()), **r} for i, r in zip(out.index, out.to_dict("records"))],
             "regime": fc.regime.iloc[-1], "vol_regime": fc.vol_regime.iloc[-1]}

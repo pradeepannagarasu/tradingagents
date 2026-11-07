@@ -153,7 +153,8 @@ def make_record(engine, mode="PAPER", simulated=False):
     p = plan()
     ra = engine.assess(ctx(p, decision_id="dec1", mode=mode, bid=999.9, ask=1000.1), pf())
     assert ra.approved
-    return {"id": "dec1", "final_decision": "BUY / LONG", "horizon": "SWING", "simulated_data": simulated,
+    from datetime import datetime, timezone
+    return {"id": "dec1", "final_decision": "BUY / LONG", "market_data_as_of": datetime.now(timezone.utc).isoformat(), "horizon": "SWING", "simulated_data": simulated,
             "judge": {"plan": p.model_dump(mode="json"), "reasons": ["test"]}, "risk": ra.model_dump(mode="json")}
 
 
@@ -257,3 +258,11 @@ def test_kite_adapter_param_building_and_auth_handling():
         KiteAdapter("k", "t", client).positions()
     with pytest.raises(AuthExpired):
         KiteAdapter("", "", client).positions()
+
+
+def test_stale_decision_cannot_become_order(store, engine):
+    om, _ = manager(store, engine)
+    rec = make_record(engine)
+    rec["market_data_as_of"] = "2019-03-15T10:00:00+00:00"
+    with pytest.raises(ValueError, match="stale"):
+        om.create_ticket(rec, "PAPER")

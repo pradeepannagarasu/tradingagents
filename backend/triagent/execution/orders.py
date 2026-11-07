@@ -75,8 +75,10 @@ def ticket_hash(ticket: dict) -> str:
 
 class OrderManager:
     def __init__(self, store: Store, risk: RiskEngine, controls: EmergencyControls, settings,
-                 paper: BrokerAdapter, live: BrokerAdapter | None = None, account: str = "PAPER-ACCOUNT"):
+                 paper: BrokerAdapter, live: BrokerAdapter | None = None, account: str = "PAPER-ACCOUNT",
+                 max_decision_age_days: float = 4.0):
         self.store, self.risk, self.controls, self.settings = store, risk, controls, settings
+        self.max_decision_age_days = max_decision_age_days
         self.paper, self.live, self.account = paper, live, account
 
     def broker_for(self, mode: str) -> BrokerAdapter:
@@ -92,6 +94,11 @@ class OrderManager:
     def create_ticket(self, record: dict, mode: str) -> dict:
         if record["final_decision"] == Decision.NO_TRADE.value:
             raise ValueError("NO TRADE decisions cannot become orders")
+        as_of = datetime.fromisoformat(str(record["market_data_as_of"]).replace("Z", "+00:00"))
+        age_days = (datetime.now(timezone.utc) - as_of).total_seconds() / 86400
+        if age_days > self.max_decision_age_days:
+            raise ValueError(f"Decision is based on market data {age_days:.1f} days old — stale data cannot become an "
+                             "order. Re-run research on current data.")
         risk = record.get("risk") or {}
         if not risk.get("approved"):
             raise ValueError("Risk engine did not approve this decision")

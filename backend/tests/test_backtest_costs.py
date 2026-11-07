@@ -126,3 +126,12 @@ def test_walk_forward_uses_each_test_window_once(profile, series_factory):
     assert len(tests) == len(set(tests)) >= 2
     for fold in wf["folds"]:
         assert fold["train"][1] < fold["test"][0]
+
+
+def test_backtest_result_is_json_serialisable(profile, series_factory):
+    import json
+    f = compute_all(series_factory(n=900).bars)
+    res = run_backtest(f, StrategySpec("trend_pullback"), EQ, Horizon.SWING, profile)
+    json.dumps(res.to_dict())
+    json.dumps(walk_forward(f, StrategySpec("trend_pullback"), {"stop_atr": [2.0]}, EQ, Horizon.SWING, profile,
+                            train_years=1, test_years=1))

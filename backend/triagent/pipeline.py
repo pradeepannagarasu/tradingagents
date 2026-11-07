@@ -152,7 +152,12 @@ class Services:
             sess = self.profile.session(pd.Timestamp(as_of).date())
             decision_time = (sess[1] if sess else pd.Timestamp(as_of).tz_localize("UTC").to_pydatetime()) \
                 + timedelta(minutes=1)
-        quality = check_price_series(fc.series, self.profile, self.settings.section("data_quality"),
+        series_pit = fc.series
+        if as_of:  # quality must describe the data available at the decision time, not today's file
+            series_pit = PriceSeries(fc.series.symbol, fc.series.timeframe, fc.series.bars.loc[:pd.Timestamp(as_of)],
+                                     fc.series.source, fc.series.licence, fc.series.retrieved_at, fc.series.adjusted,
+                                     fc.series.adjustment_note, fc.series.simulated, fc.series.url)
+        quality = check_price_series(series_pit, self.profile, self.settings.section("data_quality"),
                                      underlying.instrument_type, as_of=decision_time)
         src = SourceRef(source=fc.series.source, url=fc.series.url, retrieved_at=fc.series.retrieved_at,
                         licence=fc.series.licence, simulated=fc.series.simulated)

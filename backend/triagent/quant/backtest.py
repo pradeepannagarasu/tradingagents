@@ -57,7 +57,7 @@ class BacktestResult:
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
+        return _py({
             "strategy": {"name": self.strategy.name, "params": self.strategy.params, "stop_atr": self.strategy.stop_atr,
                          "target_r": self.strategy.target_r, "max_hold_bars": self.strategy.max_hold_bars},
             "metrics": self.metrics,
@@ -69,7 +69,18 @@ class BacktestResult:
             "trades": self.trades[-200:],
             "equity_curve": [[str(k.date()) if hasattr(k, "date") else str(k), round(float(v), 2)]
                              for k, v in self.equity.iloc[:: max(1, len(self.equity) // 400)].items()],
-        }
+        })
+
+
+def _py(o):
+    """Convert numpy scalars/containers to plain Python so results are JSON-serialisable."""
+    if isinstance(o, dict):
+        return {str(k): _py(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_py(v) for v in o]
+    if isinstance(o, np.generic):
+        return o.item()
+    return o
 
 
 def run_backtest(features: pd.DataFrame, spec: StrategySpec, instrument: Instrument, horizon: Horizon,
@@ -109,7 +120,7 @@ def run_backtest(features: pd.DataFrame, spec: StrategySpec, instrument: Instrum
     pos = None
     trades: list[dict] = []
     equity_vals = []
-    i0, i1 = window[0], window[-1]
+    i0, i1 = int(window[0]), int(window[-1])
 
     for i in range(i0, i1 + 1):
         # 1) manage open position on bar i
