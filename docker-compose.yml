@@ -7,6 +7,7 @@ services:
       POSTGRES_DB: triagent
       POSTGRES_USER: triagent
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    restart: unless-stopped
     volumes:
       - dbdata:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d:ro
@@ -21,6 +22,10 @@ services:
       DATABASE_URL: postgresql+psycopg://triagent:${POSTGRES_PASSWORD}@db:5432/triagent
       TRIAGENT_IMPORT_DIR: /app/data/import
       CORS_ORIGINS: http://localhost:8080
+      # Hard safety lock — not overridable from .env in this compose file.
+      TRIAGENT_PAPER_ONLY: "true"
+      LIVE_TRADING_ENABLED: "false"
+    restart: unless-stopped
     volumes:
       - ./data/import:/app/data/import:ro
     depends_on:

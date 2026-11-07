@@ -82,6 +82,8 @@ class OrderManager:
         self.paper, self.live, self.account = paper, live, account
 
     def broker_for(self, mode: str) -> BrokerAdapter:
+        if mode == "LIVE" and getattr(self.settings, "paper_only", False):
+            raise LiveTradingDisabled("Paper-only deployment: LIVE execution is locked off on the server")
         if mode == "LIVE":
             if self.live is None:
                 raise LiveTradingDisabled("No live broker configured")

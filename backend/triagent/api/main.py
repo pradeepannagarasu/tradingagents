@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from triagent.api.security import SecurityMiddleware
 from triagent.config import get_settings
 from triagent.core.models import HORIZON_SPEC, Horizon, InstrumentType
 from triagent.data.connectors import ConnectorUnavailable, CsvConnector, SyntheticConnector, YahooChartConnector
@@ -58,8 +59,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Tri-Agent Market Intelligence API", version="0.1.0", lifespan=lifespan,
               description="Research & decision-support API. Not investment advice. LIVE execution disabled by default.")
-app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(","),
-                   allow_methods=["*"], allow_headers=["*"])
+# Explicit origins only. In the Cloudflare deployment the dashboard calls /api same-origin through the Pages
+# gateway, so CORS is not needed there; CORS_ORIGINS lists the exact dashboard origin(s) as a backstop.
+app.add_middleware(CORSMiddleware,
+                   allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
+                                  if o.strip() and o.strip() != "*"],
+                   allow_methods=["GET", "POST"], allow_headers=["content-type"], allow_credentials=False)
+app.add_middleware(SecurityMiddleware)  # outermost: auth + rate limit + headers run before CORS/routing
 
 
 _loop: asyncio.AbstractEventLoop | None = None
@@ -87,6 +93,7 @@ def system():
         "market": st.section("system").get("market"), "timezone": st.section("system").get("timezone"),
         "llm_provider": st.section("llm").get("provider"), "weights": st.weights, "thresholds": st.thresholds,
         "risk_limits": st.section("risk"), "credentials_present": st.secrets_present,
+        "paper_only_lock": st.paper_only,
         "calibrated": s.calibrator is not None,
     }
 

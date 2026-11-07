@@ -1,0 +1,23 @@
+# Overlay for exposing the local backend through Cloudflare Tunnel + Access.
+#   docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml up -d --build
+# No inbound ports are opened: cloudflared makes an outbound connection to Cloudflare.
+# The public hostname (markets-api.<domain>) is protected by a Cloudflare Access app that only admits the
+# Pages gateway's service token; the backend verifies that JWT again (AUTH_MODE=cloudflare_access).
+services:
+  backend:
+    environment:
+      AUTH_MODE: cloudflare_access
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:?set in .env}
+      CF_ACCESS_AUD: ${CF_ACCESS_BACKEND_AUD:?set in .env}
+      CF_ACCESS_SERVICE_TOKEN_IDS: ${CF_ACCESS_SERVICE_TOKEN_ID:?set in .env}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS:?set in .env}
+      CORS_ORIGINS: ${DASHBOARD_ORIGIN:?set in .env}
+  tunnel:
+    image: cloudflare/cloudflared:2024.12.2
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?paste the tunnel token into .env (never commit it)}
+    depends_on: [backend]
+    restart: unless-stopped
+  frontend:
+    profiles: ["local-ui"]   # the dashboard is served by Cloudflare Pages in this mode

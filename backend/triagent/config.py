@@ -52,12 +52,22 @@ class Settings:
         return self.raw.get(name, {})
 
     @property
+    def paper_only(self) -> bool:
+        """Hard lock (default ON): LIVE mode and live brokers cannot be activated by config, env or API."""
+        return _env_bool("TRIAGENT_PAPER_ONLY", True)
+
+    @property
     def mode(self) -> str:
-        return os.environ.get("TRIAGENT_MODE", self.section("system").get("mode", "PAPER")).upper()
+        m = os.environ.get("TRIAGENT_MODE", self.section("system").get("mode", "PAPER")).upper()
+        if m == "LIVE" and self.paper_only:
+            raise RuntimeError("TRIAGENT_MODE=LIVE refused: TRIAGENT_PAPER_ONLY is enabled (paper/research only)")
+        return m
 
     @property
     def live_trading_enabled(self) -> bool:
-        """Live trading requires BOTH the config flag and the env flag."""
+        """Live trading requires the config flag, the env flag AND the paper-only lock to be off."""
+        if self.paper_only:
+            return False
         return bool(self.section("system").get("live_trading_enabled", False)) and self.live_trading_env_flag
 
     @property
