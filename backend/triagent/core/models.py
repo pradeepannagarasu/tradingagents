@@ -233,6 +233,7 @@ class DataQualityReport(BaseModel):
     gaps: list[dict[str, Any]]
     stale: bool
     checked_at: datetime
+    data_label: str = "UNKNOWN"   # REAL | DELAYED | SIMULATED
 
 
 class DecisionRecord(BaseModel):

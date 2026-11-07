@@ -101,3 +101,21 @@ def test_store_roundtrip_and_append_only(store, series_factory):
     with pytest.raises(Exception):
         with store.engine.begin() as c:
             c.execute(text("UPDATE audit_log SET event='HACK'"))
+
+
+def test_data_labels():
+    from triagent.data.connectors.base import data_label
+    assert data_label("SIMULATED regime-switching generator", True) == "SIMULATED"
+    assert data_label("Yahoo Finance (unofficial)", False) == "DELAYED"
+    assert data_label("NSE Indices", False) == "REAL"
+
+
+def test_feature_cache_refreshes_after_reingest_from_another_process(settings, store):
+    from triagent.pipeline import Services
+    api_side = Services.create(settings, store)
+    cli_side = Services.create(settings, store)          # e.g. `docker compose exec backend python -m triagent.cli`
+    cli_side.ingest(SyntheticConnector(seed=1).fetch("NIFTY 50", start="2020-01-01"))
+    first = api_side.features("NIFTY 50").features["close"].iloc[-1]
+    import time; time.sleep(0.01)
+    cli_side.ingest(SyntheticConnector(seed=2).fetch("NIFTY 50", start="2020-01-01"))
+    assert api_side.features("NIFTY 50").features["close"].iloc[-1] != first

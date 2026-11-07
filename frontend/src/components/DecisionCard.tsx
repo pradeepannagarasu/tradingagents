@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, decisionClass, fmt, inr } from "../api";
+import { DataBadge } from "./DataBadge";
 
 export function DecisionCard({ rec }: { rec: any }) {
   const j = rec.judge;
@@ -15,7 +16,7 @@ export function DecisionCard({ rec }: { rec: any }) {
   }
   return (
     <div className="card">
-      <h2>Trade decision</h2>
+      <h2>Trade decision <DataBadge label={rec.data_quality.data_label ?? (rec.simulated_data ? "SIMULATED" : undefined)} /></h2>
       {rec.simulated_data && <div className="notice">SIMULATED DATA — this is a demonstration of the workflow, not a real market signal.</div>}
       <div className={`decision ${decisionClass(rec.final_decision)}`}>{rec.final_decision}</div>
       {rec.final_decision !== j.decision && <p className="small">Judge proposed <b>{j.decision}</b>; final decision changed by the risk engine.</p>}

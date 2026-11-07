@@ -3,6 +3,7 @@ import { api } from "../api";
 import { AgentPanel, JudgePanel } from "../components/Agents";
 import { DecisionCard } from "../components/DecisionCard";
 import { PriceChart } from "../components/PriceChart";
+import { DataBadge } from "../components/DataBadge";
 
 export function Research({ initialId }: { initialId?: string }) {
   const [symbol, setSymbol] = useState("NIFTY 50");
@@ -10,12 +11,13 @@ export function Research({ initialId }: { initialId?: string }) {
   const [asOf, setAsOf] = useState("");
   const [rec, setRec] = useState<any>(null);
   const [bars, setBars] = useState<any[]>([]);
+  const [label, setLabel] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => { if (initialId) api(`/api/decisions/${initialId}`).then(setRec).catch(e => setErr(e.message)); }, [initialId]);
   useEffect(() => {
-    api(`/api/market/bars/${encodeURIComponent(symbol)}?limit=6000`).then(d => setBars(d.bars)).catch(() => setBars([]));
+    api(`/api/market/bars/${encodeURIComponent(symbol)}?limit=6000`).then(d => { setBars(d.bars); setLabel(d.data_label); }).catch(() => setBars([]));
   }, [symbol]);
 
   async function run() {
@@ -43,7 +45,7 @@ export function Research({ initialId }: { initialId?: string }) {
         <button className="btn" onClick={run} disabled={busy}>{busy ? "Running agents…" : "Run BULL / BEAR / JUDGE"}</button>
       </div>
       {err && <div className="error">{err}</div>}
-      {shownBars.length > 0 && <div className="card"><h2>{symbol} — daily</h2><PriceChart bars={shownBars} levels={levels} /></div>}
+      {shownBars.length > 0 && <div className="card"><h2>{symbol} — daily <DataBadge label={label} /> <span className="muted small">last bar {shownBars[shownBars.length - 1]?.time}</span></h2><PriceChart bars={shownBars} levels={levels} /></div>}
       {rec && (<>
         <DecisionCard rec={rec} />
         <div className="grid cols-3">

@@ -22,3 +22,13 @@ def test_postgres_store_and_append_only(series_factory):
     with pytest.raises(Exception, match="append-only"):
         with s.engine.begin() as c:
             c.execute(text("DELETE FROM audit_log"))  # row trigger needs ≥1 row
+
+
+def test_concurrent_startup_does_not_race():
+    """API container + CLI starting together must not fail schema initialisation."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from triagent.data.store import Store
+    with ThreadPoolExecutor(6) as ex:
+        stores = list(ex.map(lambda _: Store(URL), range(6)))
+    assert all(s.verify_audit_chain()[0] for s in stores)

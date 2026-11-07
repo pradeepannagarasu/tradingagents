@@ -4,6 +4,8 @@
   python -m triagent.cli research --symbol "NIFTY 50" --horizon SWING [--as-of 2024-06-28]
   python -m triagent.cli report --symbol "NIFTY 50" --out ../docs/reports/BACKTEST_REPORT.md
   python -m triagent.cli paper-demo
+  python -m triagent.cli migrate        # create/verify schema, triggers, hypertable
+  python -m triagent.cli demo-setup     # SIMULATED data + one risk-approved decision for a dashboard paper trade
 """
 from __future__ import annotations
 
@@ -139,6 +141,47 @@ def cmd_paper_demo(a):
     print("Audit chain valid:", svc.store.verify_audit_chain())
 
 
+def cmd_migrate(a):
+    """Create/verify the schema (idempotent) and report tables, append-only triggers and the Timescale hypertable."""
+    from sqlalchemy import inspect, text
+    svc = _svc()
+    eng = svc.store.engine
+    tables = sorted(inspect(eng).get_table_names())
+    print("database:", eng.dialect.name, "| tables:", ", ".join(tables))
+    if eng.dialect.name == "postgresql":
+        with eng.connect() as c:
+            trig = c.execute(text("SELECT tgname FROM pg_trigger WHERE tgname LIKE '%append_only'")).scalars().all()
+            print("append-only triggers:", trig)
+            try:
+                ht = c.execute(text("SELECT hypertable_name FROM timescaledb_information.hypertables")).scalars().all()
+                print("timescale hypertables:", ht)
+            except Exception:  # noqa: BLE001
+                print("timescale hypertables: TimescaleDB extension not available (plain PostgreSQL is fine)")
+    print("audit chain valid:", svc.store.verify_audit_chain())
+    print("paper-only lock:", svc.settings.paper_only, "| live trading enabled:", svc.settings.live_trading_enabled,
+          "| mode:", svc.settings.mode)
+
+
+def cmd_demo_setup(a):
+    """Load a clearly-labelled SIMULATED 'NIFTY 50' series whose CURRENT decision passes the risk engine, so the
+    full research → ticket → CONFIRM TRADE → paper fill workflow can be exercised from the dashboard.
+    Replaces any loaded NIFTY 50 dataset. Places NO orders."""
+    svc = _svc()
+    for seed in range(a.max_seeds):
+        svc.ingest(SyntheticConnector(seed=seed).fetch("NIFTY 50"))
+        for h in (Horizon.SWING, Horizon.POSITIONAL, Horizon.SHORT):
+            r = svc.run_research("NIFTY 50", h, persist=False)
+            if r.risk and r.risk.approved:
+                rec = svc.run_research("NIFTY 50", h)  # persisted decision for the dashboard
+                print(f"SIMULATED series loaded (seed {seed}). Decision {rec.id}: {rec.final_decision.value} "
+                      f"{rec.instrument.symbol} {h.value}, data as of {rec.market_data_as_of:%Y-%m-%d}, "
+                      f"risk APPROVED qty {rec.risk.quantity}.")
+                print("Open the dashboard → History → click this decision → 'Prepare order ticket…' → type CONFIRM TRADE.")
+                print("The risk approval expires 15 minutes after the decision; if it expires, re-run this command.")
+                return
+    print(f"No risk-approved decision in {a.max_seeds} simulated seeds — every signal was rejected (valid outcome).")
+
+
 def main():
     p = argparse.ArgumentParser(prog="triagent")
     sp = p.add_subparsers(required=True)
@@ -159,6 +202,10 @@ def main():
     rp.add_argument("--step", type=int, default=5)
     rp.set_defaults(fn=cmd_report)
     sp.add_parser("paper-demo").set_defaults(fn=cmd_paper_demo)
+    sp.add_parser("migrate").set_defaults(fn=cmd_migrate)
+    ds = sp.add_parser("demo-setup")
+    ds.add_argument("--max-seeds", type=int, default=40)
+    ds.set_defaults(fn=cmd_demo_setup)
     a = p.parse_args()
     a.fn(a)
 

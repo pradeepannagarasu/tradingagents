@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from triagent.api.security import SecurityMiddleware
 from triagent.config import get_settings
 from triagent.core.models import HORIZON_SPEC, Horizon, InstrumentType
+from triagent.data.connectors.base import data_label
 from triagent.data.connectors import ConnectorUnavailable, CsvConnector, SyntheticConnector, YahooChartConnector
 from triagent.data.inventory import DATA_SOURCES
 from triagent.execution.broker_base import LiveTradingDisabled
@@ -102,7 +103,8 @@ def system():
 @app.get("/api/data/inventory")
 def inventory():
     s = services()
-    return {"sources": DATA_SOURCES, "loaded": s.store.list_datasets()}
+    loaded = [{**d, "data_label": data_label(d["source"], d["simulated"])} for d in s.store.list_datasets()]
+    return {"sources": DATA_SOURCES, "loaded": loaded}
 
 
 class IngestRequest(BaseModel):
@@ -159,6 +161,7 @@ def bars(symbol: str, limit: int = 400):
     out = f[cols].astype(float).round(4).astype(object)
     out = out.where(pd.notna(out), None)  # warm-up NaNs → null (NaN is not valid JSON)
     return {"symbol": symbol, "simulated": fc.series.simulated, "source": fc.series.source,
+            "data_label": data_label(fc.series.source, fc.series.simulated),
             "bars": [{"time": str(i.date()), **r} for i, r in zip(out.index, out.to_dict("records"))],
             "regime": fc.regime.iloc[-1], "vol_regime": fc.vol_regime.iloc[-1]}
 
@@ -178,6 +181,7 @@ def overview():
                              "change_pct": round(float(c.iloc[-1] / c.iloc[-2] - 1), 4),
                              "as_of": str(c.index[-1].date()), "regime": fc.regime.iloc[-1],
                              "vol_regime": fc.vol_regime.iloc[-1], "simulated": fc.series.simulated,
+                             "data_label": data_label(fc.series.source, fc.series.simulated),
                              "source": fc.series.source}
         out["as_of"] = str(c.index[-1].date())
     out["unavailable"] += ["Market breadth (A/D)", "Sector performance", "FII/DII flows",
@@ -264,6 +268,7 @@ def backtest(req: BacktestRequest):
                          slippage_bps=rk["default_slippage_bps"])
     res = run_backtest(fc.features, spec, inst, Horizon.SWING, s.profile, cfg, req.start, req.end).to_dict()
     res["simulated_data"] = fc.series.simulated
+    res["data_label"] = data_label(fc.series.source, fc.series.simulated)
     if req.walk_forward:
         res["walk_forward"] = walk_forward(fc.features, spec, {"stop_atr": [1.5, 2.0, 3.0], "target_r": [1.5, 2.0, 3.0]},
                                            inst, Horizon.SWING, s.profile, cfg)

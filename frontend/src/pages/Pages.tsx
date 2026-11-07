@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, decisionClass, fmt, inr, pct } from "../api";
+import { DataBadge } from "../components/DataBadge";
 
 function useLoad<T>(path: string, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -18,7 +19,7 @@ export function Dashboard({ open, tick }: { open: (id: string) => void; tick: nu
     <div className="grid">
       {n?.simulated && <div className="notice">The loaded NIFTY 50 series is SIMULATED. Load real data on the Data page before drawing any conclusion.</div>}
       <div className="grid cols-4">
-        <div className="card"><h2>NIFTY 50</h2>
+        <div className="card"><h2>NIFTY 50 {n && <DataBadge label={n.data_label} />}</h2>
           {n ? (<><div className="stat">{fmt(n.last)}</div>
             <div className={n.change >= 0 ? "up" : "down"}>{n.change >= 0 ? "+" : ""}{fmt(n.change)} ({pct(n.change_pct, 2)})</div>
             <div className="small muted">as of {n.as_of} · {n.source}</div></>) : <p className="muted">Not loaded</p>}
@@ -101,6 +102,7 @@ export function Backtest() {
         <button className="btn secondary" onClick={calibrate} disabled={!!busy}>{busy === "cal" ? "Replaying agents…" : "Calibrate judge (OOS)"}</button>
       </div>
       {err && <div className="error">{err}</div>}
+      {res && <DataBadge label={res.data_label} />}
       {res?.simulated_data && <div className="notice">Backtest on SIMULATED data — validates the engine, says nothing about real NIFTY performance.</div>}
       {m && (<div className="grid cols-2">
         <div className="card"><h2>Metrics (after costs & slippage)</h2>
@@ -165,7 +167,7 @@ export function Data() {
       </div>
       <div className="card"><h2>Loaded datasets</h2>
         {inv.data?.loaded?.map((d: any) => (<details key={d.symbol + d.timeframe} open>
-          <summary><b>{d.symbol}</b> {d.timeframe} · {d.first_bar} → {d.last_bar} · {d.n_bars} bars · <span className={`pill ${d.quality_status === "PASS" ? "good" : d.quality_status === "FAIL" ? "bad" : "warn"}`}>{d.quality_status}</span> {d.simulated && <span className="pill warn">SIMULATED</span>}</summary>
+          <summary><b>{d.symbol}</b> {d.timeframe} · {d.first_bar} → {d.last_bar} · {d.n_bars} bars · <span className={`pill ${d.quality_status === "PASS" ? "good" : d.quality_status === "FAIL" ? "bad" : "warn"}`}>{d.quality_status}</span> <DataBadge label={d.data_label} /></summary>
           <dl className="kv small" style={{ marginTop: 6 }}><dt>Source</dt><dd>{d.source}</dd><dt>Licence</dt><dd>{d.licence}</dd><dt>Retrieved</dt><dd>{d.retrieved_at}</dd><dt>Last success</dt><dd>{d.last_success}</dd><dt>Adjustment</dt><dd>{d.adjustment_note}</dd></dl>
           <ul className="tight small">{d.quality_json?.issues?.map((i: string, k: number) => <li key={k}>{i}</li>)}</ul>
           {d.quality_json?.gaps?.length > 0 && <table><thead><tr><th>Gap from</th><th>to</th><th className="num">days</th></tr></thead><tbody>{d.quality_json.gaps.map((g: any, k: number) => <tr key={k}><td>{g.from}</td><td>{g.to}</td><td className="num">{g.missing_days}</td></tr>)}</tbody></table>}

@@ -93,8 +93,10 @@ class Services:
         return q.model_dump(mode="json")
 
     def features(self, symbol: str) -> FeatureCache:
-        if symbol in self._cache:
-            return self._cache[symbol]
+        version = self.store.dataset_version(symbol)
+        cached = self._cache.get(symbol)
+        if cached is not None and cached[0] == version:
+            return cached[1]
         ps = self.store.load_series(symbol)
         if ps is None:
             raise KeyError(f"No data loaded for {symbol}. Ingest data first.")
@@ -104,7 +106,7 @@ class Services:
             bench = b.bars["close"] if b is not None else None
         f = compute_all(ps.bars, bench)
         fc = FeatureCache(f, volatility_regime(f), market_regime(f), ps)
-        self._cache[symbol] = fc
+        self._cache[symbol] = (version, fc)  # re-computed when any process re-ingests this dataset
         return fc
 
     def last_price(self, symbol: str) -> float | None:

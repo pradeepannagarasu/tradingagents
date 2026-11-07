@@ -37,66 +37,157 @@ variables**, so nothing secret is compiled into the JavaScript.
 
 ## Run the backend on your Windows PC
 
-1. Install **Docker Desktop** with the WSL2 backend, and **Git**. Start Docker Desktop.
-2. In PowerShell:
+**Requirements:**
+- Windows 10 22H2 or Windows 11, 64-bit, with CPU virtualisation enabled.
+- 8 GB RAM recommended (4 GB minimum).
+- At least **15 GB free on C:**. Docker Desktop and WSL use about 5 GB; the images (Python, TimescaleDB, cloudflared) about 2 GB; and the 20-year daily database is under 100 MB.
+- An admin account, needed once to install Docker and WSL.
+
+All commands are PowerShell. Run them one block at a time.
+
+### 1. Check the PC
 
 ```powershell
-git clone https://github.com/pradeepannagarasu/tradingagents.git
+Get-ComputerInfo -Property OsName,OsVersion,OsArchitecture,CsTotalPhysicalMemory
 ```
 
 ```powershell
+Get-PSDrive C | Select-Object @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}
+```
+
+```powershell
+(Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled
+```
+
+```powershell
+docker --version
+```
+
+```powershell
+git --version
+```
+
+```powershell
+wsl --status
+```
+
+### 2. Install anything missing (admin PowerShell, then reboot)
+
+```powershell
+wsl --install
+```
+
+```powershell
+winget install -e --id Git.Git
+```
+
+```powershell
+winget install -e --id Docker.DockerDesktop
+```
+
+After rebooting, start **Docker Desktop**, accept the terms, and wait for "Engine running". Then check it:
+
+```powershell
+docker run --rm hello-world
+```
+
+### 3. Get the code
+
+```powershell
+cd $HOME
+git clone -b claude/affectionate-turing-3f1pya https://github.com/pradeepannagarasu/tradingagents.git
 cd tradingagents
-git checkout claude/affectionate-turing-3f1pya
-copy .env.example .env
+git log --oneline -1
+```
+
+### 4. Create `.env`
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Generate two random values for the next step. Hex only, so they are safe inside a database URL:
+
+```powershell
+$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ($b | % { $_.ToString('x2') }) -join ''
+```
+
+Run it twice: once for `POSTGRES_PASSWORD`, once for `RISK_SIGNING_KEY`. Then open the file:
+
+```powershell
 notepad .env
 ```
 
-3. Fill in `.env`. These are not secrets, except the last one and the two you generate:
+Set these lines. Use no quotes and no spaces around `=`. Keep the other lines as they are:
 
 ```
-POSTGRES_PASSWORD=<choose a long random password>
-RISK_SIGNING_KEY=<run: python -c "import secrets;print(secrets.token_hex(32))", or any 64 hex chars>
+POSTGRES_PASSWORD=<first value>
+RISK_SIGNING_KEY=<second value>
 CF_ACCESS_TEAM_DOMAIN=charlies-kitchen-pages.cloudflareaccess.com
-CF_ACCESS_BACKEND_AUD=<AUD tag of "TRI-AGENT API": Zero Trust → Access → Applications → TRI-AGENT API → Overview>
+CF_ACCESS_BACKEND_AUD=b82a98b71d77198f568b41395f9ca70dc97b98d9fb5019f5de9c8a3dd234f757
 CF_ACCESS_SERVICE_TOKEN_ID=15d675929ac6349b77910c539ad1250f.access
 ALLOWED_EMAILS=pradeepandigital@gmail.com
 DASHBOARD_ORIGIN=https://markets.webloom.network
-CLOUDFLARE_TUNNEL_TOKEN=<Zero Trust → Networks → Tunnels → triagent-pc → Configure → copy the token from the install command>
+CLOUDFLARE_TUNNEL_TOKEN=<see step 5>
 ```
 
-The tunnel token is a secret. Keep it only in `.env`, which git ignores. Never paste it into chat or commit it.
+### 5. Tunnel token (secret: never paste it into chat or commit it)
 
-4. Start the stack:
+1. Go to https://one.dash.cloudflare.com, then **Networks → Tunnels**. Newer dashboards label this **Networks → Connectors → Cloudflare Tunnels**.
+2. Open tunnel **`triagent-pc`**, then **Configure** (or **Edit**).
+3. Under *Install and run a connector*, pick **Docker**. The command shown ends in `--token eyJ...`.
+4. Copy **only the long string after `--token`** into the `CLOUDFLARE_TUNNEL_TOKEN=` line in Notepad, and save.
+5. Don't run the command Cloudflare shows. Compose starts the connector for you.
+
+### 6. Start PostgreSQL, FastAPI and the tunnel
 
 ```powershell
 docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml up -d --build
 ```
 
-5. Load data. This uses Yahoo, which works from your PC. Alternatively, import the NSE CSV from the Data page:
-
-```powershell
-docker compose exec backend python -m triagent.cli ingest --source yahoo --symbol "NIFTY 50"
-```
-
-6. Open https://markets.webloom.network, enter your email, then the PIN from your inbox.
-
-Check status with:
+The first build takes 3–10 minutes. Then check the stack:
 
 ```powershell
 docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml ps
 ```
 
-Watch the tunnel with:
+`db` should show `healthy`, and `backend` and `tunnel` `running`. Check the tunnel log:
 
 ```powershell
-docker compose logs -f tunnel
+docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml logs --tail 20 tunnel
 ```
 
-The tunnel shows **HEALTHY** in Zero Trust → Networks → Tunnels.
+Expect `Registered tunnel connection` (four times).
+
+### 7. Schema check, then data
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml exec backend python -m triagent.cli migrate
+```
+
+To load real end-of-day prices, labelled **DELAYED** (unofficial Yahoo feed):
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml exec backend python -m triagent.cli ingest --source yahoo --symbol "NIFTY 50"
+```
+
+Or load **SIMULATED** data, plus one risk-approved decision for a paper trade. This replaces the NIFTY 50 dataset:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml exec backend python -m triagent.cli demo-setup
+```
+
+### 8. Use it
+
+Open https://markets.webloom.network and log in with the emailed PIN. Opening https://markets.webloom.network/api/system in the same browser should show JSON with `"mode":"PAPER"` and `"paper_only_lock":true`.
 
 **Availability:** the backend is offline whenever the PC is off, asleep or disconnected. The dashboard then
-shows "Backend unreachable". Data persists in the Docker volume `dbdata` on your PC; back it up with
-`docker compose exec db pg_dump -U triagent triagent > backup.sql`.
+shows "Backend unreachable". To stop it sleeping: Settings → System → Power → Screen and sleep → "Never" while
+you use it. Data persists in the Docker volume `dbdata` on your PC. To back it up:
+
+```powershell
+docker compose exec db pg_dump -U triagent triagent > backup.sql
+```
 
 ## Safety locks in this deployment
 
