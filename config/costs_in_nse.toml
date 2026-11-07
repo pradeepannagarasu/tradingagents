@@ -1,0 +1,48 @@
+# NSE transaction-cost schedule (INR). Rates are fractions of turnover unless noted.
+# Effective-dated so historical backtests use the rate in force at the time.
+#
+# VERIFY BEFORE RELYING ON THESE NUMBERS. They were compiled on 2026-11-07 from
+# secondary summaries of Finance Acts / NSE circulars, not from the primary texts.
+# In particular the 2026-04-01 F&O STT increase (Union Budget 2026) has conflicting
+# effective dates in secondary sources. Check incometaxindia.gov.in and NSE circulars.
+
+[brokerage]                    # default: typical discount-broker plan — set to YOUR broker
+delivery_pct = 0.0
+delivery_flat_max = 0.0
+intraday_pct = 0.0003
+intraday_flat_max = 20.0       # per executed order, whichever is lower
+futures_pct = 0.0003
+futures_flat_max = 20.0
+options_flat = 20.0            # per executed order
+
+[gst]
+rate = 0.18                    # on brokerage + exchange charges + SEBI fee
+
+[sebi]
+fee_rate = 0.000001            # ₹10 per crore
+
+[dp]
+delivery_sell_per_scrip = 15.93
+
+# STT: list of [effective_from, rate]
+[stt]
+delivery_both_sides = [["2004-10-01", 0.00125], ["2013-06-01", 0.001]]
+intraday_sell = [["2004-10-01", 0.00025]]
+futures_sell = [["2004-10-01", 0.00017], ["2013-06-01", 0.0001], ["2023-04-01", 0.000125], ["2024-10-01", 0.0002], ["2026-04-01", 0.0005]]
+options_sell_premium = [["2004-10-01", 0.00017], ["2016-06-01", 0.0005], ["2023-04-01", 0.000625], ["2024-10-01", 0.001], ["2026-04-01", 0.0015]]
+
+[exchange_txn]                 # NSE transaction charges
+equity = [["2004-01-01", 0.0000325], ["2024-10-01", 0.0000297]]
+futures = [["2004-01-01", 0.000019], ["2024-10-01", 0.0000173]]
+options_premium = [["2004-01-01", 0.0005], ["2024-10-01", 0.0003503]]
+
+[stamp_duty_buy]               # uniform national stamp duty from 2020-07-01; earlier varied by state (approximated)
+delivery = [["2004-01-01", 0.00015]]
+intraday = [["2004-01-01", 0.00003]]
+futures = [["2004-01-01", 0.00002]]
+options = [["2004-01-01", 0.00003]]
+
+[contracts]                    # VERIFY against current NSE contract specifications
+nifty_lot_size = [["2015-10-30", 75], ["2021-07-30", 50], ["2024-12-26", 75], ["2025-12-30", 65]]
+# Weekly/monthly NIFTY expiry weekday (0=Mon). NSE moved from Thursday to Tuesday in 2025.
+nifty_expiry_weekday = [["2000-01-01", 3], ["2025-09-01", 1]]

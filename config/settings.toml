@@ -1,0 +1,68 @@
+# Tri-Agent Market Intelligence — default configuration.
+# Every value here is a starting assumption, NOT a validated truth.
+# Override with config/local.toml (git-ignored) or environment variables.
+
+[system]
+market = "IN_NSE"                # market profile id (see triagent/markets)
+timezone = "Asia/Kolkata"
+currency = "INR"
+mode = "PAPER"                   # RESEARCH | PAPER | LIVE
+live_trading_enabled = false     # must ALSO be enabled via env LIVE_TRADING_ENABLED=true
+require_human_approval = true    # cannot be disabled in this version
+
+[scoring.weights]               # initial weights — test out of sample before trusting
+technical = 0.20
+fundamental = 0.15
+macro_regime = 0.15
+news_events = 0.10
+derivatives = 0.10
+historical = 0.15
+risk_reward = 0.15
+
+[scoring.thresholds]
+min_composite_for_trade = 0.25   # |composite| needed to consider BUY/SELL (range -1..1)
+min_category_coverage = 0.45     # fraction of total weight that must have real evidence
+min_risk_reward = 1.5
+max_agent_disagreement_for_trade = 0.9
+min_history_bars = 250
+
+[debate]
+max_rounds = 2
+max_points_per_round = 3
+
+[data_quality]
+max_staleness_trading_days = 3   # daily bars older than this → stale
+max_intraday_staleness_minutes = 15
+abnormal_move_pct_index = 12.0   # single-day move above this flagged for review
+abnormal_move_pct_equity = 25.0
+min_bars_required = 250
+
+[risk]
+capital = 1_000_000.0                 # INR — user configurable
+max_capital_per_trade_pct = 20.0
+max_risk_per_trade_pct = 1.0
+max_daily_loss = 20_000.0
+max_weekly_loss = 50_000.0
+max_open_positions = 5
+max_sector_exposure_pct = 40.0
+max_leverage = 1.0                    # 1.0 = no leverage
+max_drawdown_pct = 10.0
+min_avg_daily_value_multiple = 50.0   # avg daily traded value must exceed position value × this
+max_spread_bps = 15.0
+min_stop_distance_atr = 0.5
+max_stop_distance_atr = 4.0
+max_india_vix = 30.0                  # above → reject new positions
+block_expiry_day_options = true
+default_slippage_bps = 5.0
+
+[llm]
+provider = "none"                # none | anthropic | openai_compatible
+bull_model = ""
+bear_model = ""
+judge_model = ""
+temperature = 0.0
+
+[notifications]
+telegram_enabled = false
+email_enabled = false
+in_app_enabled = true

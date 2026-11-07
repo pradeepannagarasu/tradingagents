@@ -1,0 +1,22 @@
+# secrets & local config
+.env
+.env.*
+!.env.example
+config/local.toml
+# data
+data/
+*.db
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+# node
+node_modules/
+frontend/dist/
+# os/editor
+.DS_Store
+.idea/
+.vscode/
