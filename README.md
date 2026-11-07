@@ -78,6 +78,7 @@ The dashboard is at http://localhost:8080.
 
 | | |
 |---|---|
+| [DEPLOYMENT](docs/DEPLOYMENT.md) | Cloudflare Pages + Access + Tunnel deployment, Windows backend setup |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | design principles, decision flow, folder structure, scoring |
 | [AGENTS](docs/AGENTS.md) | evidence rules, BULL/BEAR/JUDGE logic, debate, prompts |
 | [DATA_SOURCES](docs/DATA_SOURCES.md) | source-by-source inventory, coverage, quality rules |
